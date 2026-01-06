@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { RefreshCw, CloudUpload, Camera } from 'lucide-react';
 import { Button } from './Button';
@@ -65,7 +66,6 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const t = TRANSLATIONS[language];
   const currentFrame = frames.find(f => f.id === selectedFrameId) || frames[0];
   const fonts = { 
     title: 60, 
@@ -137,6 +137,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
         audio: false
       };
 
+      // Fix: Use navigator.mediaDevices.getUserMedia instead of the deprecated navigator.getUserMedia
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       setIsCameraReady(true);
@@ -295,7 +296,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
 
   if (step === 'home') {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-between animate-fade-in overflow-hidden relative pb-4 pt-4">
+      <div className="h-full w-full flex flex-col items-center justify-between animate-fade-in overflow-hidden relative pb-3 pt-2">
         {showFlash && <div className="fixed inset-0 z-[100] bg-white animate-pulse" />}
         
         {processingState !== 'idle' && (
@@ -308,29 +309,33 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             </div>
         )}
 
-        <div className="w-full text-center flex-shrink-0 px-4 mb-0">
+        {/* HEADER */}
+        <div className="w-full text-center flex-shrink-0 px-4 mb-1">
             <div 
-                className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-[0.1em] mb-1 shadow-lg"
-                style={{ fontSize: `${fonts.badge * 0.8}px` }}
+                className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-[0.1em] mb-1 shadow-lg"
+                style={{ fontSize: `${fonts.badge * 0.7}px` }}
             >
                 {theme.topBadgeText}
             </div>
-          <h2 
-                className="font-[900] tracking-tighter leading-none text-white uppercase drop-shadow-2xl"
-                style={{ fontSize: `${fonts.title * 0.9}px` }}
+            <h2 
+                className="font-[900] tracking-tighter leading-none text-white uppercase drop-shadow-2xl mb-1"
+                style={{ fontSize: `${fonts.title * 0.8}px` }}
             >
                 {theme.eventTitle}
             </h2>
-             <p 
-                className="mt-0.5 font-extrabold bg-gradient-to-r from-[#f59e0b] to-[#10b981] bg-clip-text text-transparent italic"
-                style={{ fontSize: `${fonts.subtitle * 0.9}px` }}
-             >
+            {theme.eventSubtitle && (
+              <p 
+                className="text-slate-400 font-medium tracking-wide uppercase opacity-80"
+                style={{ fontSize: `${fonts.subtitle * 0.6}px` }}
+              >
                 {theme.eventSubtitle}
-            </p>
+              </p>
+            )}
         </div>
 
-        <div className="flex-grow w-full flex items-center justify-center px-4 py-1 min-h-0 relative overflow-hidden">
-            <div className="relative h-full w-auto aspect-[4/5] max-w-full overflow-hidden rounded-[2.5rem] border-2 border-white/20 bg-black shadow-[0_0_60px_rgba(16,185,129,0.15)] flex items-center justify-center ring-4 ring-black/20 transition-all duration-500">
+        {/* CAMERA AREA */}
+        <div className="flex-grow w-full flex items-center justify-center px-4 py-0 min-h-0 relative overflow-hidden">
+            <div className="relative h-full w-auto aspect-[4/5] max-w-full overflow-hidden rounded-[2rem] border-2 border-white/10 bg-black shadow-[0_0_50px_rgba(16,185,129,0.1)] flex items-center justify-center ring-2 ring-black/20">
                  {isCameraReady ? (
                     <div className="relative w-full h-full">
                        <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${!theme.preferredCameraId ? 'scale-x-[-1]' : ''}`} />
@@ -338,32 +343,33 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                          <img src={currentFrame.url} alt="" className="w-full h-full object-contain" />
                        </div>
                        {countdown !== null && (
-                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20 animate-fade-in">
-                           <span className="text-[15rem] font-black text-white animate-ping drop-shadow-2xl">
+                         <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20">
+                           <span className="text-[12rem] font-black text-white animate-ping drop-shadow-2xl">
                              {countdown}
                            </span>
                          </div>
                        )}
                     </div>
                  ) : (
-                    <div className="text-center space-y-6">
-                       {cameraError ? <p className="text-white/60 font-bold text-xl px-10">{cameraError}</p> : <div className="w-16 h-16 border-8 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />}
+                    <div className="text-center">
+                       {cameraError ? <p className="text-white/60 font-bold px-10">{cameraError}</p> : <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />}
                     </div>
                  )}
             </div>
         </div>
 
-        <div className="w-full max-w-md flex-shrink-0 px-6 mt-2 flex">
+        {/* FOOTER BUTTON */}
+        <div className="w-full max-w-[320px] flex-shrink-0 px-4 mt-2 flex">
             <Button 
                 variant="visual" 
                 onClick={startCaptureSequence} 
                 disabled={!isCameraReady || processingState !== 'idle' || countdown !== null} 
-                className="w-full py-3 font-black rounded-2xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
+                className="w-full py-2.5 font-black rounded-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 text-base"
                 style={{ fontSize: `${fonts.button * 0.9}px` }}
             >
                 {countdown !== null ? `CHUẨN BỊ... ${countdown}` : (
                   <>
-                    <Camera className="w-5 h-5" />
+                    <Camera className="w-4 h-4" />
                     {theme.captureButtonText}
                   </>
                 )}
@@ -375,45 +381,45 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
 
   if (step === 'result' && finalImage) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center px-4 pb-8 pt-4 animate-fade-in overflow-hidden gap-4">
+      <div className="h-full w-full flex flex-col items-center justify-center px-4 pb-6 pt-2 animate-fade-in overflow-hidden gap-3">
         
         <div className="w-full text-center flex-shrink-0">
             <h2 
                 className="font-black text-white mb-0.5 uppercase tracking-tighter drop-shadow-2xl text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400"
-                style={{ fontSize: `${fonts.resultTitle * 0.9}px` }}
+                style={{ fontSize: `${fonts.resultTitle * 0.8}px` }}
             >
                 {theme.congratsText}
             </h2>
             <p 
                 className="text-slate-100 tracking-wide font-medium opacity-90"
-                style={{ fontSize: `${fonts.resultSubtitle * 0.9}px` }}
+                style={{ fontSize: `${fonts.resultSubtitle * 0.8}px` }}
             >
                 {theme.resultInstructions}
             </p>
         </div>
 
-        <div className="relative h-[65%] w-auto aspect-[4/5] rounded-[2rem] overflow-hidden shadow-[0_30px_80px_-20px_rgba(0,0,0,1)] border-2 border-white/20 bg-slate-900 ring-4 ring-black/40 shrink-0">
+        <div className="relative h-[68%] w-auto aspect-[4/5] rounded-[1.5rem] overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border-2 border-white/10 bg-slate-900 shrink-0">
             <img src={finalImage} alt="Result" className="w-full h-full object-contain" />
         </div>
 
-        <div className="w-full max-sm:max-w-[320px] max-w-sm flex items-stretch gap-2 shrink-0 z-20 h-24">
-            <div className="flex-[2.5] bg-white rounded-[1.5rem] p-2.5 flex items-center gap-3 shadow-[0_0_40px_rgba(16,185,129,0.4)] border border-emerald-400/50">
-                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1 flex items-center justify-center border border-slate-100 shadow-inner">
+        <div className="w-full max-w-[300px] flex items-stretch gap-2 shrink-0 z-20 h-20">
+            <div className="flex-[2.5] bg-white rounded-[1rem] p-2 flex items-center gap-2.5 shadow-xl border border-emerald-400/30">
+                <div className="h-full aspect-square bg-slate-50 rounded-lg p-1 flex items-center justify-center border border-slate-100">
                     <QRCode value={cloudUrl || window.location.href} style={{ height: "100%", width: "100%" }} />
                 </div>
-                <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
+                <div className="flex-1 flex flex-col justify-center min-w-0">
                      <p 
-                        className="font-black leading-none text-slate-900 uppercase tracking-tighter whitespace-nowrap mb-1"
-                        style={{ fontSize: `${fonts.qrTitle * 0.65}px` }}
+                        className="font-black leading-none text-slate-900 uppercase tracking-tighter whitespace-nowrap mb-0.5"
+                        style={{ fontSize: `${fonts.qrTitle * 0.55}px` }}
                      >
                         {theme.qrScanText}
                      </p>
                      <div 
                         className="flex items-center gap-1 text-emerald-700 font-bold italic truncate"
-                        style={{ fontSize: `${fonts.qrSubtitle * 0.75}px` }}
+                        style={{ fontSize: `${fonts.qrSubtitle * 0.65}px` }}
                      >
-                        {cloudUrl ? <CloudUpload className="w-4 h-4" /> : <RefreshCw className="w-4 h-4 animate-spin" />}
-                        <span>{cloudUrl ? "Quét để nhận ảnh!" : "Đang tạo mã..."}</span>
+                        {cloudUrl ? <CloudUpload className="w-3.5 h-3.5" /> : <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                        <span>{cloudUrl ? "Quét để tải!" : "Chờ xíu..."}</span>
                      </div>
                 </div>
             </div>
@@ -423,12 +429,12 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                 onClick={handleRetake} 
                 isLoading={isDeleting} 
                 disabled={isDeleting} 
-                className="flex-1 rounded-[1.5rem] flex-col gap-0.5 !px-1 bg-slate-800/95 hover:bg-slate-700 backdrop-blur-3xl border-white/10 shadow-xl" 
-                style={{ fontSize: `${fonts.button * 0.65}px` }}
+                className="flex-1 rounded-[1rem] flex-col gap-0.5 !px-1 bg-slate-800/90 border-white/5 shadow-xl" 
+                style={{ fontSize: `${fonts.button * 0.6}px` }}
             >
-                <RefreshCw className="w-5 h-5 mb-0.5 text-emerald-400" /> 
+                <RefreshCw className="w-4 h-4 mb-0.5 text-emerald-400" /> 
                 <span className="leading-none text-center font-bold uppercase">{theme.retakeButtonText}</span> 
-                {autoHomeCountdown !== null && <span className="font-mono text-emerald-400/60 text-[10px] mt-0.5">({autoHomeCountdown}s)</span>}
+                {autoHomeCountdown !== null && <span className="font-mono text-emerald-400/60 text-[9px]">({autoHomeCountdown}s)</span>}
             </Button>
         </div>
       </div>
