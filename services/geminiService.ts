@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 const cleanBase64 = (dataUri: string) => {
@@ -38,6 +39,7 @@ const resizeAndCompressImage = (base64Str: string, maxWidth = 1024, quality = 0.
 
 export const generateAiFrame = async (prompt: string): Promise<string> => {
   try {
+    // Correctly initialize with named parameter and environment variable
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -47,8 +49,15 @@ export const generateAiFrame = async (prompt: string): Promise<string> => {
       config: { imageConfig: { aspectRatio: "3:4" } }, 
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+    // Iterate through all parts to find the image part as recommended for image generation models
+    const candidates = response.candidates;
+    if (candidates && candidates.length > 0) {
+      const parts = candidates[0].content.parts;
+      for (const part of parts) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
+      }
     }
     throw new Error("No image generated.");
   } catch (error) {
@@ -61,7 +70,8 @@ export const remixUserPhoto = async (imageSrc: string, style: 'mascot' | 'cyberp
   const apiKey = process.env.API_KEY;
   if (!apiKey) throw new Error("API Key is missing from environment");
 
-  const ai = new GoogleGenAI({ apiKey });
+  // Correctly initialize with named parameter and environment variable
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const optimizedImage = await resizeAndCompressImage(imageSrc, 1024, 0.85);
   const base64Data = cleanBase64(optimizedImage);
 
@@ -90,9 +100,11 @@ export const remixUserPhoto = async (imageSrc: string, style: 'mascot' | 'cyberp
       }
     });
 
-    const parts = response.candidates?.[0]?.content?.parts;
-    if (!parts) throw new Error("Empty response from Gemini");
+    // Safely extract parts from candidates and find the image data
+    const candidates = response.candidates;
+    if (!candidates || candidates.length === 0) throw new Error("Empty response from Gemini");
 
+    const parts = candidates[0].content.parts;
     for (const part of parts) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;

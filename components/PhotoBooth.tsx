@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, RefreshCw, XCircle, CloudUpload, Camera } from 'lucide-react';
+import { RefreshCw, CloudUpload, Camera } from 'lucide-react';
 import { Button } from './Button';
 import { Frame, ThemeConfig, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -308,7 +308,6 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             </div>
         )}
 
-        {/* HEADER SECTION - Reduced margin */}
         <div className="w-full text-center flex-shrink-0 px-4 mb-0">
             <div 
                 className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-[0.1em] mb-1 shadow-lg"
@@ -330,7 +329,6 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             </p>
         </div>
 
-        {/* CAMERA PREVIEW - Maximum expansion */}
         <div className="flex-grow w-full flex items-center justify-center px-4 py-1 min-h-0 relative overflow-hidden">
             <div className="relative h-full w-auto aspect-[4/5] max-w-full overflow-hidden rounded-[2.5rem] border-2 border-white/20 bg-black shadow-[0_0_60px_rgba(16,185,129,0.15)] flex items-center justify-center ring-4 ring-black/20 transition-all duration-500">
                  {isCameraReady ? (
@@ -355,14 +353,13 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             </div>
         </div>
 
-        {/* FOOTER BUTTONS - Smaller button */}
         <div className="w-full max-w-md flex-shrink-0 px-6 mt-2 flex">
             <Button 
                 variant="visual" 
                 onClick={startCaptureSequence} 
                 disabled={!isCameraReady || processingState !== 'idle' || countdown !== null} 
-                className="w-full py-3.5 font-black rounded-2xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
-                style={{ fontSize: `${fonts.button}px` }}
+                className="w-full py-3 font-black rounded-2xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
+                style={{ fontSize: `${fonts.button * 0.9}px` }}
             >
                 {countdown !== null ? `CHUẨN BỊ... ${countdown}` : (
                   <>
@@ -399,21 +396,21 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             <img src={finalImage} alt="Result" className="w-full h-full object-contain" />
         </div>
 
-        <div className="w-full max-w-sm flex items-stretch gap-2 shrink-0 z-20 h-24 sm:h-28">
-            <div className="flex-[2] bg-white rounded-[1.5rem] p-3 flex items-center gap-3 shadow-[0_0_40px_rgba(16,185,129,0.4)] border border-emerald-400/50">
-                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1.5 flex items-center justify-center border border-slate-100 shadow-inner">
+        <div className="w-full max-sm:max-w-[320px] max-w-sm flex items-stretch gap-2 shrink-0 z-20 h-24">
+            <div className="flex-[2.5] bg-white rounded-[1.5rem] p-2.5 flex items-center gap-3 shadow-[0_0_40px_rgba(16,185,129,0.4)] border border-emerald-400/50">
+                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1 flex items-center justify-center border border-slate-100 shadow-inner">
                     <QRCode value={cloudUrl || window.location.href} style={{ height: "100%", width: "100%" }} />
                 </div>
                 <div className="flex-1 flex flex-col justify-center min-w-0 pr-1">
                      <p 
                         className="font-black leading-none text-slate-900 uppercase tracking-tighter whitespace-nowrap mb-1"
-                        style={{ fontSize: `${fonts.qrTitle * 0.7}px` }}
+                        style={{ fontSize: `${fonts.qrTitle * 0.65}px` }}
                      >
                         {theme.qrScanText}
                      </p>
                      <div 
                         className="flex items-center gap-1 text-emerald-700 font-bold italic truncate"
-                        style={{ fontSize: `${fonts.qrSubtitle * 0.8}px` }}
+                        style={{ fontSize: `${fonts.qrSubtitle * 0.75}px` }}
                      >
                         {cloudUrl ? <CloudUpload className="w-4 h-4" /> : <RefreshCw className="w-4 h-4 animate-spin" />}
                         <span>{cloudUrl ? "Quét để nhận ảnh!" : "Đang tạo mã..."}</span>
@@ -426,11 +423,11 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                 onClick={handleRetake} 
                 isLoading={isDeleting} 
                 disabled={isDeleting} 
-                className="flex-1 rounded-[1.5rem] flex-col gap-0.5 !px-1.5 bg-slate-800/95 hover:bg-slate-700 backdrop-blur-3xl border-white/10 shadow-xl" 
-                style={{ fontSize: `${fonts.button * 0.7}px` }}
+                className="flex-1 rounded-[1.5rem] flex-col gap-0.5 !px-1 bg-slate-800/95 hover:bg-slate-700 backdrop-blur-3xl border-white/10 shadow-xl" 
+                style={{ fontSize: `${fonts.button * 0.65}px` }}
             >
-                <RefreshCw className="w-6 h-6 mb-0.5 text-emerald-400" /> 
-                <span className="leading-none text-center font-bold">{theme.retakeButtonText}</span> 
+                <RefreshCw className="w-5 h-5 mb-0.5 text-emerald-400" /> 
+                <span className="leading-none text-center font-bold uppercase">{theme.retakeButtonText}</span> 
                 {autoHomeCountdown !== null && <span className="font-mono text-emerald-400/60 text-[10px] mt-0.5">({autoHomeCountdown}s)</span>}
             </Button>
         </div>
