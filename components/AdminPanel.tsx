@@ -4,7 +4,7 @@ import { TRANSLATIONS } from '../constants';
 import { generateAiFrame } from '../services/geminiService';
 import { saveSystemConfiguration } from '../services/firebaseService';
 import { Button } from './Button';
-import { Sparkles, Trash2, Plus, Image as ImageIcon, Type, Palette, LayoutTemplate, Upload, Camera, Monitor, Cloud, Save, Wallpaper, Loader } from 'lucide-react';
+import { Sparkles, Trash2, Plus, Image as ImageIcon, Type, Palette, LayoutTemplate, Upload, Camera, Monitor, Cloud, Save, Loader } from 'lucide-react';
 
 interface AdminPanelProps {
   frames: Frame[];
@@ -358,7 +358,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* Background Settings */}
                 <section className="space-y-4 bg-slate-900/40 p-6 rounded-[2rem] border border-white/5">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><Wallpaper className="w-5 h-5 text-blue-400"/> {t.backgroundSettings}</h3>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><ImageIcon className="w-5 h-5 text-blue-400"/> {t.backgroundSettings}</h3>
                     <div className="flex items-center gap-6">
                         <div className="w-32 h-20 bg-black/40 rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden relative group">
                             {theme.backgroundImageUrl ? (
