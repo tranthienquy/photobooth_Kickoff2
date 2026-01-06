@@ -5,6 +5,10 @@ import { FirebaseConfig, Frame, ThemeConfig, AdminStats } from "../types";
 
 const { initializeApp, getApp, getApps } = firebaseApp;
 
+const getFirebaseApp = (config: FirebaseConfig) => {
+    return getApps().length === 0 ? initializeApp(config) : getApp();
+};
+
 const uploadAsset = async (storage: any, base64String: string, path: string): Promise<string> => {
   if (!base64String || !base64String.startsWith('data:')) return base64String;
   
@@ -19,7 +23,7 @@ export const uploadToFirebase = async (base64Image: string, config: FirebaseConf
     throw new Error("Firebase config is incomplete");
   }
   
-  const app = getApps().length === 0 ? initializeApp(config) : getApp();
+  const app = getFirebaseApp(config);
   const storage = getStorage(app);
   
   const fileName = `photos/aiyogu_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
@@ -28,14 +32,15 @@ export const uploadToFirebase = async (base64Image: string, config: FirebaseConf
   try {
     const dataPart = base64Image.split(',')[1];
     
-    // Tải lên với metadata chính xác
+    // 1. Upload
     await uploadString(storageRef, dataPart, 'base64', { 
         contentType: 'image/jpeg',
         cacheControl: 'public,max-age=31536000'
     });
     
-    // Lấy URL ngay lập tức
+    // 2. Lấy URL download chính thức
     const downloadUrl = await getDownloadURL(storageRef);
+    console.log("Firebase Upload Success:", downloadUrl);
     return downloadUrl;
   } catch (error) {
     console.error("Firebase Storage error:", error);
@@ -46,10 +51,11 @@ export const uploadToFirebase = async (base64Image: string, config: FirebaseConf
 export const deleteFromFirebase = async (imageUrl: string, config: FirebaseConfig): Promise<void> => {
   if (!config.apiKey || !imageUrl) return;
 
-  const app = getApps().length === 0 ? initializeApp(config) : getApp();
+  const app = getFirebaseApp(config);
   const storage = getStorage(app);
   
   try {
+    // Nếu imageUrl là link đầy đủ, Firebase Storage SDK có thể parse được
     const storageRef = ref(storage, imageUrl);
     await deleteObject(storageRef);
   } catch (error) {
@@ -59,7 +65,7 @@ export const deleteFromFirebase = async (imageUrl: string, config: FirebaseConfi
 
 export const incrementPhotoCount = async (config: FirebaseConfig): Promise<void> => {
   if (!config.apiKey || !config.projectId) return;
-  const app = getApps().length === 0 ? initializeApp(config) : getApp();
+  const app = getFirebaseApp(config);
   const db = getFirestore(app);
   const docRef = doc(db, "settings", "global");
   
@@ -80,7 +86,7 @@ export const saveSystemConfiguration = async (
 ): Promise<{ frames: Frame[], theme: ThemeConfig }> => {
   if (!config.apiKey || !config.projectId) throw new Error("Missing Firebase Config");
 
-  const app = getApps().length === 0 ? initializeApp(config) : getApp();
+  const app = getFirebaseApp(config);
   const storage = getStorage(app);
   const db = getFirestore(app);
 
@@ -129,7 +135,7 @@ export const getSystemConfiguration = async (
 ): Promise<{ frames: Frame[], theme: ThemeConfig, stats: AdminStats } | null> => {
   if (!config.apiKey || !config.projectId) return null;
   
-  const app = getApps().length === 0 ? initializeApp(config) : getApp();
+  const app = getFirebaseApp(config);
   const db = getFirestore(app);
   
   try {
