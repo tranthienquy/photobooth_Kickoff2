@@ -1,5 +1,4 @@
-// Fix: Follow @google/genai guidelines for imports and model initialization
-import {GoogleGenAI} from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 const cleanBase64 = (dataUri: string) => {
   return dataUri.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
@@ -39,12 +38,11 @@ const resizeAndCompressImage = (base64Str: string, maxWidth = 1024, quality = 0.
 
 export const generateAiFrame = async (prompt: string): Promise<string> => {
   try {
-    // Fix: Create instance right before API call
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { 
-          parts: [{ text: `Create a professional 4:5 portrait photo frame border with theme: ${prompt}. Center must be transparent.` }] 
+          parts: [{ text: `Create a professional 4:5 portrait photo frame border with theme: ${prompt}. The center of the frame must be perfectly transparent white or empty space. Style: High-tech, clean, minimalist.` }] 
       },
       config: { 
         imageConfig: { aspectRatio: "3:4" } 
@@ -53,9 +51,7 @@ export const generateAiFrame = async (prompt: string): Promise<string> => {
 
     const candidates = response.candidates;
     if (candidates && candidates.length > 0) {
-      const parts = candidates[0].content.parts;
-      // Fix: Iterate parts to find the image part as per guideline
-      for (const part of parts) {
+      for (const part of candidates[0].content.parts) {
         if (part.inlineData) {
           return `data:image/png;base64,${part.inlineData.data}`;
         }
@@ -69,24 +65,27 @@ export const generateAiFrame = async (prompt: string): Promise<string> => {
 };
 
 export const remixUserPhoto = async (imageSrc: string, style: 'mascot' | 'cyberpunk' | 'anime' | 'portrait'): Promise<string> => {
-  // Fix: Create instance right before API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const optimizedImage = await resizeAndCompressImage(imageSrc, 1024, 0.85);
   const base64Data = cleanBase64(optimizedImage);
 
-  // Assertive prompt for Mascot placement
-  let prompt = `URGENT TASK: ADD A 3D MASCOT CHARACTER "AIYOGU" INTO THIS PHOTO.
+  // Re-engineered prompt for consistent mascot generation
+  let prompt = `URGENT PHOTO EDITING TASK: Add the official 3D mascot "AIYOGU" into this portrait.
   
-  MASCOT APPEARANCE: 
-  A friendly, vibrant orange 3D plump creature. It has curved horns with glowing cyan/neon blue rings. Sparkling big eyes. Wearing a thick gold chain with a medallion that says "Aiyogu".
-  
-  PLACEMENT RULE:
-  - Place Aiyogu standing or floating IMMEDIATELY NEXT to the person in the photo.
-  - The mascot should occupy about 25% of the frame.
-  - KEEP THE ORIGINAL PERSON AND BACKGROUND 100% THE SAME.
-  - Lighting should match the original photo.
-  
-  Return ONLY the modified image.`;
+  MASCOT CHARACTER DESCRIPTION:
+  - Name: AIYOGU
+  - Appearance: A friendly, plump, vibrant orange 3D creature.
+  - Features: Curved horns with glowing cyan/neon blue rings at the base. Big, sparkling, expressive eyes.
+  - Accessory: Wearing a chunky gold chain with a medallion.
+  - Style: Modern 3D animation style (like Pixar or Dreamworks).
+
+  PLACEMENT INSTRUCTIONS:
+  - Place AIYOGU standing right next to the person in the photo, appearing as if they are posing together for a selfie.
+  - AIYOGU should be clearly visible and take up approximately 25-30% of the frame.
+  - IMPORTANT: Maintain the original person, background, and lighting of the source photo perfectly.
+  - Blend the mascot's lighting to match the environment of the photo.
+
+  RETURN ONLY THE MODIFIED IMAGE.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -103,16 +102,14 @@ export const remixUserPhoto = async (imageSrc: string, style: 'mascot' | 'cyberp
     });
 
     const candidates = response.candidates;
-    if (!candidates || candidates.length === 0) throw new Error("Empty response from Gemini");
+    if (!candidates || candidates.length === 0) throw new Error("Empty response from AI");
 
-    const parts = candidates[0].content.parts;
-    // Fix: Iterate parts to find the image part
-    for (const part of parts) {
+    for (const part of candidates[0].content.parts) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-    throw new Error("No image found in AI response");
+    throw new Error("No image part found in AI response");
   } catch (error) {
     console.error("AI Remix service error:", error);
     throw error;

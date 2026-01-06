@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { RefreshCw, CloudUpload, Camera } from 'lucide-react';
+import { RefreshCw, CloudUpload, Camera, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 import { Frame, ThemeConfig, Language } from '../types';
 import { remixUserPhoto } from '../services/geminiService';
@@ -121,14 +121,10 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
   const startCamera = async () => {
     setCameraError(null);
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(d => d.kind === 'videoinput');
-      const preferredExists = videoDevices.some(d => d.deviceId === theme.preferredCameraId);
-
-      let constraints: MediaStreamConstraints = {
+      const constraints: MediaStreamConstraints = {
         video: {
-            deviceId: (theme.preferredCameraId && preferredExists) ? { ideal: theme.preferredCameraId } : undefined,
-            facingMode: (theme.preferredCameraId && preferredExists) ? undefined : 'user',
+            deviceId: theme.preferredCameraId ? { ideal: theme.preferredCameraId } : undefined,
+            facingMode: theme.preferredCameraId ? undefined : 'user',
             width: { ideal: 1920 }, 
             height: { ideal: 1080 }
         },
@@ -140,7 +136,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
       setIsCameraReady(true);
     } catch (err) {
       console.error("Camera Access Error:", err);
-      setCameraError(language === 'vi' ? "Vui lòng cấp quyền camera" : "Please grant camera access");
+      setCameraError(language === 'vi' ? "Không thể truy cập Camera" : "Camera access denied");
     }
   };
 
@@ -176,24 +172,26 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
   const processImage = async (base64Image: string) => {
     setProcessingState('ai');
     try {
+      // 1. Remix with AI Mascot
       const remixedImage = await remixUserPhoto(base64Image, 'mascot');
+      
+      // 2. Add Frame
       const finalResult = await compositeFrame(remixedImage, currentFrame.url);
       setFinalImage(finalResult);
       
       stopCamera();
       setStep('result');
 
-      // Bắt đầu quy trình Upload ngay sau khi có ảnh kết quả
+      // 3. Store to Cloud
       if (theme.firebaseConfig?.apiKey) {
           setProcessingState('uploading');
           try {
               const url = await uploadToFirebase(finalResult, theme.firebaseConfig);
               setCloudUrl(url);
-              // Cập nhật thống kê số lượng ảnh
               await incrementPhotoCount(theme.firebaseConfig);
               onPhotoTaken();
           } catch (e) {
-              console.error("Firebase auto-upload failed", e);
+              console.error("Cloud storage failed:", e);
           } finally {
               setProcessingState('idle');
           }
@@ -203,7 +201,8 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
       }
       
     } catch (error) {
-      console.error("AI processing failed, falling back to original", error);
+      console.error("Mascot Remix Failed:", error);
+      // Fallback: Just add frame to original photo
       const finalResult = await compositeFrame(base64Image, currentFrame.url);
       setFinalImage(finalResult);
       stopCamera();
@@ -219,43 +218,37 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
     setTimeout(() => setShowFlash(false), 200);
     
     const video = videoRef.current;
-    const track = streamRef.current?.getVideoTracks()[0];
-    const settings = track?.getSettings();
-    
-    const sourceW = video.videoWidth;
-    const sourceH = video.videoHeight;
-    const targetRatio = 4 / 5;
-    const videoRatio = sourceW / sourceH;
-    
-    let renderW, renderH, startX, startY;
-
-    if (videoRatio > targetRatio) {
-        renderH = sourceH;
-        renderW = sourceH * targetRatio;
-        startX = (sourceW - renderW) / 2;
-        startY = 0;
-    } else {
-        renderW = sourceW;
-        renderH = sourceW / targetRatio;
-        startX = 0;
-        startY = (sourceH - renderH) / 2;
-    }
-
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
     canvas.height = 1350;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const isExternal = !!theme.preferredCameraId;
-    const shouldMirror = !isExternal && (settings?.facingMode === 'user' || !settings?.facingMode);
+    // Handle cropping to 4:5 ratio from center
+    const sourceW = video.videoWidth;
+    const sourceH = video.videoHeight;
+    const targetRatio = 4 / 5;
+    let drawW, drawH, drawX, drawY;
 
-    if (shouldMirror) {
+    if (sourceW / sourceH > targetRatio) {
+        drawH = sourceH;
+        drawW = sourceH * targetRatio;
+        drawX = (sourceW - drawW) / 2;
+        drawY = 0;
+    } else {
+        drawW = sourceW;
+        drawH = sourceW / targetRatio;
+        drawX = 0;
+        drawY = (sourceH - drawH) / 2;
+    }
+
+    // Mirroring for user facing camera
+    if (!theme.preferredCameraId) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
     }
 
-    ctx.drawImage(video, startX, startY, renderW, renderH, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, drawX, drawY, drawW, drawH, 0, 0, canvas.width, canvas.height);
     const capturedImage = canvas.toDataURL('image/jpeg', 1.0);
     
     processImage(capturedImage);
@@ -350,8 +343,16 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                        )}
                     </div>
                  ) : (
-                    <div className="text-center">
-                       {cameraError ? <p className="text-white/60 font-bold px-10">{cameraError}</p> : <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />}
+                    <div className="text-center p-6">
+                       {cameraError ? (
+                           <div className="flex flex-col items-center gap-4 text-red-400">
+                               <AlertCircle className="w-12 h-12" />
+                               <p className="font-bold">{cameraError}</p>
+                               <Button variant="secondary" onClick={startCamera} className="py-2 px-4 text-xs">Thử lại</Button>
+                           </div>
+                       ) : (
+                           <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
+                       )}
                     </div>
                  )}
             </div>
