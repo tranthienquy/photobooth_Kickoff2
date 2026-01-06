@@ -1,11 +1,10 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Frame, AdminStats, ThemeConfig, Language, InfoBadge, FirebaseConfig } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { generateAiFrame } from '../services/geminiService';
 import { saveSystemConfiguration } from '../services/firebaseService';
 import { Button } from './Button';
-import { Sparkles, Trash2, Plus, Image as ImageIcon, Type, Palette, LayoutTemplate, XCircle, Upload, Camera, Monitor, Cloud, Save, Wallpaper, Loader } from 'lucide-react';
+import { Sparkles, Trash2, Plus, Image as ImageIcon, Type, Palette, LayoutTemplate, Upload, Camera, Monitor, Cloud, Save, Wallpaper, Loader } from 'lucide-react';
 
 interface AdminPanelProps {
   frames: Frame[];
