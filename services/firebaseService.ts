@@ -1,4 +1,3 @@
-// Fix: Use namespaced import for better compatibility with different module systems
 import * as firebaseApp from "firebase/app";
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, increment } from "firebase/firestore";
@@ -19,24 +18,29 @@ export const uploadToFirebase = async (base64Image: string, config: FirebaseConf
   if (!config.apiKey || !config.storageBucket) {
     throw new Error("Firebase config is incomplete");
   }
+  
   const app = getApps().length === 0 ? initializeApp(config) : getApp();
   const storage = getStorage(app);
   
+  // Tạo tên file ngẫu nhiên để tránh trùng lặp
   const fileName = `photos/aiyogu_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
   const storageRef = ref(storage, fileName);
 
   try {
     const dataPart = base64Image.split(',')[1];
-    // Use uploadString for convenience with Base64
+    
+    // Upload lên Firebase Storage
     const snapshot = await uploadString(storageRef, dataPart, 'base64', { 
         contentType: 'image/jpeg',
         cacheControl: 'public,max-age=31536000'
     });
+    
+    // Lấy URL tải xuống chính thức
     const downloadUrl = await getDownloadURL(snapshot.ref);
-    console.log("Uploaded successfully:", downloadUrl);
+    console.log("Firebase storage upload success:", downloadUrl);
     return downloadUrl;
   } catch (error) {
-    console.error("Firebase upload error:", error);
+    console.error("Firebase storage upload failed:", error);
     throw error;
   }
 };
@@ -47,8 +51,8 @@ export const deleteFromFirebase = async (imageUrl: string, config: FirebaseConfi
   const app = getApps().length === 0 ? initializeApp(config) : getApp();
   const storage = getStorage(app);
   
-  // We need to extract the path from the full URL or handle it safely
   try {
+    // Trích xuất path từ URL nếu cần, hoặc dùng thẳng URL
     const storageRef = ref(storage, imageUrl);
     await deleteObject(storageRef);
     console.log("Deleted image from cloud:", imageUrl);
@@ -68,7 +72,7 @@ export const incrementPhotoCount = async (config: FirebaseConfig): Promise<void>
         "stats.totalPhotos": increment(1)
     });
   } catch (error) {
-      console.warn("Stats doc missing, creating new one...");
+      console.warn("Stats doc missing in Firestore, creating new one...");
       await setDoc(docRef, { stats: { totalPhotos: 1 } }, { merge: true });
   }
 };
@@ -120,7 +124,7 @@ export const saveSystemConfiguration = async (
     
     return { frames: processedFrames, theme: processedTheme };
   } catch (error) {
-    console.error("Error saving configuration:", error);
+    console.error("Error saving configuration to Firestore:", error);
     throw error;
   }
 };
@@ -147,7 +151,7 @@ export const getSystemConfiguration = async (
     }
     return null;
   } catch (error) {
-    console.error("Error fetching config:", error);
+    console.error("Error fetching config from Firestore:", error);
     return null;
   }
 };

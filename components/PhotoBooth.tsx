@@ -2,9 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { RefreshCw, CloudUpload, Camera } from 'lucide-react';
 import { Button } from './Button';
 import { Frame, ThemeConfig, Language } from '../types';
-import { TRANSLATIONS } from '../constants';
 import { remixUserPhoto } from '../services/geminiService';
-import { uploadToFirebase, deleteFromFirebase } from '../services/firebaseService';
+import { uploadToFirebase, deleteFromFirebase, incrementPhotoCount } from '../services/firebaseService';
 import QRCode from 'react-qr-code';
 
 const AiyoguLoadingIcon = ({ label, customIconUrl, fontSize }: { label: string, customIconUrl?: string, fontSize?: number }) => (
@@ -92,7 +91,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
 
   useEffect(() => {
     if (step === 'result') {
-      setAutoHomeCountdown(45); 
+      setAutoHomeCountdown(60); 
     } else {
       setAutoHomeCountdown(null);
     }
@@ -181,20 +180,27 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
       const finalResult = await compositeFrame(remixedImage, currentFrame.url);
       setFinalImage(finalResult);
       
+      stopCamera();
+      setStep('result');
+
+      // Bắt đầu quy trình Upload ngay sau khi có ảnh kết quả
       if (theme.firebaseConfig?.apiKey) {
           setProcessingState('uploading');
           try {
               const url = await uploadToFirebase(finalResult, theme.firebaseConfig);
               setCloudUrl(url);
+              // Cập nhật thống kê số lượng ảnh
+              await incrementPhotoCount(theme.firebaseConfig);
+              onPhotoTaken();
           } catch (e) {
               console.error("Firebase auto-upload failed", e);
-              // Fallback to locally generated image even if upload fails
+          } finally {
+              setProcessingState('idle');
           }
+      } else {
+          setProcessingState('idle');
+          onPhotoTaken();
       }
-
-      stopCamera();
-      setStep('result');
-      onPhotoTaken();
       
     } catch (error) {
       console.error("AI processing failed, falling back to original", error);
@@ -202,9 +208,8 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
       setFinalImage(finalResult);
       stopCamera();
       setStep('result');
-      onPhotoTaken(); 
-    } finally {
       setProcessingState('idle');
+      onPhotoTaken(); 
     }
   };
 
@@ -392,14 +397,21 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             </p>
         </div>
 
-        <div className="relative h-[68%] w-auto aspect-[4/5] rounded-[1.5rem] overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border-2 border-white/10 bg-slate-900 shrink-0">
+        <div className="relative h-[65%] w-auto aspect-[4/5] rounded-[1.5rem] overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border-2 border-white/10 bg-slate-900 shrink-0">
             <img src={finalImage} alt="Result" className="w-full h-full object-contain" />
         </div>
 
-        <div className="w-full max-w-[320px] flex items-stretch gap-2 shrink-0 z-20 h-24">
+        <div className="w-full max-w-[340px] flex items-stretch gap-2 shrink-0 z-20 h-24">
             <div className="flex-[3] bg-white rounded-[1.5rem] p-2.5 flex items-center gap-3 shadow-2xl border-2 border-emerald-400/50">
-                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1.5 flex items-center justify-center border border-slate-100">
-                    <QRCode value={cloudUrl || "https://google.com"} style={{ height: "100%", width: "100%" }} />
+                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1 flex items-center justify-center border border-slate-100 overflow-hidden relative">
+                    {cloudUrl ? (
+                        <QRCode value={cloudUrl} style={{ height: "100%", width: "100%" }} />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-emerald-500 animate-pulse">
+                            <RefreshCw className="w-6 h-6 animate-spin mb-1" />
+                            <span className="text-[8px] font-black uppercase">Đang tạo...</span>
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 flex flex-col justify-center min-w-0">
                      <p 
@@ -413,7 +425,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                         style={{ fontSize: `${fonts.qrSubtitle * 0.75}px` }}
                      >
                         {cloudUrl ? <CloudUpload className="w-4 h-4" /> : <RefreshCw className="w-4 h-4 animate-spin" />}
-                        <span>{cloudUrl ? "Quét để tải ngay!" : "Đang tạo mã..."}</span>
+                        <span>{cloudUrl ? "Quét để tải ngay!" : "Đang đẩy lên mây..."}</span>
                      </div>
                 </div>
             </div>
