@@ -22,25 +22,23 @@ export const uploadToFirebase = async (base64Image: string, config: FirebaseConf
   const app = getApps().length === 0 ? initializeApp(config) : getApp();
   const storage = getStorage(app);
   
-  // Tạo tên file ngẫu nhiên để tránh trùng lặp
   const fileName = `photos/aiyogu_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
   const storageRef = ref(storage, fileName);
 
   try {
     const dataPart = base64Image.split(',')[1];
     
-    // Upload lên Firebase Storage
-    const snapshot = await uploadString(storageRef, dataPart, 'base64', { 
+    // Tải lên với metadata chính xác
+    await uploadString(storageRef, dataPart, 'base64', { 
         contentType: 'image/jpeg',
         cacheControl: 'public,max-age=31536000'
     });
     
-    // Lấy URL tải xuống chính thức
-    const downloadUrl = await getDownloadURL(snapshot.ref);
-    console.log("Firebase storage upload success:", downloadUrl);
+    // Lấy URL ngay lập tức
+    const downloadUrl = await getDownloadURL(storageRef);
     return downloadUrl;
   } catch (error) {
-    console.error("Firebase storage upload failed:", error);
+    console.error("Firebase Storage error:", error);
     throw error;
   }
 };
@@ -52,12 +50,10 @@ export const deleteFromFirebase = async (imageUrl: string, config: FirebaseConfi
   const storage = getStorage(app);
   
   try {
-    // Trích xuất path từ URL nếu cần, hoặc dùng thẳng URL
     const storageRef = ref(storage, imageUrl);
     await deleteObject(storageRef);
-    console.log("Deleted image from cloud:", imageUrl);
   } catch (error) {
-    console.warn("Error deleting image (might already be gone):", error);
+    console.warn("Error deleting image:", error);
   }
 };
 
@@ -72,7 +68,6 @@ export const incrementPhotoCount = async (config: FirebaseConfig): Promise<void>
         "stats.totalPhotos": increment(1)
     });
   } catch (error) {
-      console.warn("Stats doc missing in Firestore, creating new one...");
       await setDoc(docRef, { stats: { totalPhotos: 1 } }, { merge: true });
   }
 };
@@ -124,7 +119,7 @@ export const saveSystemConfiguration = async (
     
     return { frames: processedFrames, theme: processedTheme };
   } catch (error) {
-    console.error("Error saving configuration to Firestore:", error);
+    console.error("Error saving configuration:", error);
     throw error;
   }
 };
@@ -151,7 +146,7 @@ export const getSystemConfiguration = async (
     }
     return null;
   } catch (error) {
-    console.error("Error fetching config from Firestore:", error);
+    console.error("Error fetching config:", error);
     return null;
   }
 };

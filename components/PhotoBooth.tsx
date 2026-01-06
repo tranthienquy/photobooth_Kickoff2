@@ -135,8 +135,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
       streamRef.current = stream;
       setIsCameraReady(true);
     } catch (err) {
-      console.error("Camera Access Error:", err);
-      setCameraError(language === 'vi' ? "Không thể truy cập Camera" : "Camera access denied");
+      setCameraError(language === 'vi' ? "Lỗi truy cập Camera" : "Camera error");
     }
   };
 
@@ -152,37 +151,32 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
         canvas.height = uImg.naturalHeight;
         const ctx = canvas.getContext('2d');
         if (!ctx) return resolve(userImg);
-
         ctx.drawImage(uImg, 0, 0);
-
         const fImg = new Image();
         fImg.crossOrigin = "anonymous";
         fImg.src = frameUrl;
-        
         fImg.onload = () => {
           ctx.drawImage(fImg, 0, 0, canvas.width, canvas.height);
           resolve(canvas.toDataURL('image/jpeg', 0.95));
         };
-        
         fImg.onerror = () => resolve(userImg);
       };
+      uImg.onerror = () => resolve(userImg);
     });
   };
 
   const processImage = async (base64Image: string) => {
     setProcessingState('ai');
     try {
-      // 1. Remix with AI Mascot
+      // 1. Gọi AI Mascot
       const remixedImage = await remixUserPhoto(base64Image, 'mascot');
-      
-      // 2. Add Frame
+      // 2. Ghép khung
       const finalResult = await compositeFrame(remixedImage, currentFrame.url);
       setFinalImage(finalResult);
-      
       stopCamera();
       setStep('result');
 
-      // 3. Store to Cloud
+      // 3. Upload Firebase
       if (theme.firebaseConfig?.apiKey) {
           setProcessingState('uploading');
           try {
@@ -191,7 +185,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
               await incrementPhotoCount(theme.firebaseConfig);
               onPhotoTaken();
           } catch (e) {
-              console.error("Cloud storage failed:", e);
+              console.error("Upload failed:", e);
           } finally {
               setProcessingState('idle');
           }
@@ -199,12 +193,10 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
           setProcessingState('idle');
           onPhotoTaken();
       }
-      
     } catch (error) {
-      console.error("Mascot Remix Failed:", error);
-      // Fallback: Just add frame to original photo
-      const finalResult = await compositeFrame(base64Image, currentFrame.url);
-      setFinalImage(finalResult);
+      console.error("AI Mascot Process Failed:", error);
+      const fallback = await compositeFrame(base64Image, currentFrame.url);
+      setFinalImage(fallback);
       stopCamera();
       setStep('result');
       setProcessingState('idle');
@@ -224,64 +216,54 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Handle cropping to 4:5 ratio from center
     const sourceW = video.videoWidth;
     const sourceH = video.videoHeight;
     const targetRatio = 4 / 5;
-    let drawW, drawH, drawX, drawY;
+    let dW, dH, dX, dY;
 
     if (sourceW / sourceH > targetRatio) {
-        drawH = sourceH;
-        drawW = sourceH * targetRatio;
-        drawX = (sourceW - drawW) / 2;
-        drawY = 0;
+        dH = sourceH;
+        dW = sourceH * targetRatio;
+        dX = (sourceW - dW) / 2;
+        dY = 0;
     } else {
-        drawW = sourceW;
-        drawH = sourceW / targetRatio;
-        drawX = 0;
-        drawY = (sourceH - drawH) / 2;
+        dW = sourceW;
+        dH = sourceW / targetRatio;
+        dX = 0;
+        dY = (sourceH - dH) / 2;
     }
 
-    // Mirroring for user facing camera
     if (!theme.preferredCameraId) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
     }
 
-    ctx.drawImage(video, drawX, drawY, drawW, drawH, 0, 0, canvas.width, canvas.height);
-    const capturedImage = canvas.toDataURL('image/jpeg', 1.0);
-    
-    processImage(capturedImage);
+    ctx.drawImage(video, dX, dY, dW, dH, 0, 0, canvas.width, canvas.height);
+    processImage(canvas.toDataURL('image/jpeg', 0.95));
   };
 
   const handleRetake = async () => {
     if (cloudUrl && theme.firebaseConfig) {
         setIsDeleting(true);
-        try {
-            await deleteFromFirebase(cloudUrl, theme.firebaseConfig);
-        } catch (e) {
-            console.error("Delete failed", e);
-        } finally {
-            setIsDeleting(false);
-        }
+        try { await deleteFromFirebase(cloudUrl, theme.firebaseConfig); } catch (e) {} finally { setIsDeleting(false); }
     }
     setFinalImage(null);
     setCloudUrl(null);
     setStep('home');
   };
 
-  const startCaptureSequence = () => {
+  const startCountdown = () => {
     if (countdown !== null || !isCameraReady) return;
-    let currentCount = 3;
-    setCountdown(currentCount);
-    const interval = setInterval(() => {
-      currentCount -= 1;
-      if (currentCount === 0) {
-        clearInterval(interval);
+    let count = 3;
+    setCountdown(count);
+    const timer = setInterval(() => {
+      count--;
+      if (count === 0) {
+        clearInterval(timer);
         setCountdown(null);
         handleCapture();
       } else {
-        setCountdown(currentCount);
+        setCountdown(count);
       }
     }, 1000);
   };
@@ -290,89 +272,53 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
     return (
       <div className="h-full w-full flex flex-col items-center justify-between animate-fade-in overflow-hidden relative pb-3 pt-2">
         {showFlash && <div className="fixed inset-0 z-[100] bg-white animate-pulse" />}
-        
         {processingState !== 'idle' && (
-            <div className="fixed text-cyan-50 inset-0 z-[110] bg-slate-950/98 backdrop-blur-[40px] flex flex-col items-center justify-center pb-4 text-center animate-fade-in">
+            <div className="fixed inset-0 z-[110] bg-slate-950/98 backdrop-blur-[40px] flex flex-col items-center justify-center text-center animate-fade-in">
                 <AiyoguLoadingIcon 
-                  label={processingState === 'ai' ? "Đang nhờ Aiyogu đứng cùng bạn..." : "Đang chuẩn bị ảnh cho bạn..."} 
+                  label={processingState === 'ai' ? "Đang nhờ Aiyogu đứng cùng bạn..." : "Đang đẩy ảnh lên mây..."} 
                   customIconUrl={theme.loadingIconUrl}
                   fontSize={fonts.loadingText}
                 />
             </div>
         )}
 
-        {/* HEADER */}
-        <div className="w-full text-center flex-shrink-0 px-4 mb-1">
-            <div 
-                className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-[0.1em] mb-1 shadow-lg"
-                style={{ fontSize: `${fonts.badge * 0.7}px` }}
-            >
+        <div className="w-full text-center px-4 mb-1">
+            <div className="inline-flex items-center px-3 py-0.5 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-bold uppercase tracking-widest mb-1 shadow-lg text-[10px]">
                 {theme.topBadgeText}
             </div>
-            <h2 
-                className="font-[900] tracking-tighter leading-none text-white uppercase drop-shadow-2xl mb-1"
-                style={{ fontSize: `${fonts.title * 0.8}px` }}
-            >
+            <h2 className="font-black tracking-tighter leading-none text-white uppercase drop-shadow-2xl mb-1" style={{ fontSize: `${fonts.title * 0.7}px` }}>
                 {theme.eventTitle}
             </h2>
-            {theme.eventSubtitle && (
-              <p 
-                className="text-slate-400 font-medium tracking-wide uppercase opacity-80"
-                style={{ fontSize: `${fonts.subtitle * 0.6}px` }}
-              >
-                {theme.eventSubtitle}
-              </p>
-            )}
         </div>
 
-        {/* CAMERA AREA */}
-        <div className="flex-grow w-full flex items-center justify-center px-4 py-0 min-h-0 relative overflow-hidden">
-            <div className="relative h-full w-auto aspect-[4/5] max-w-full overflow-hidden rounded-[2rem] border-2 border-white/10 bg-black shadow-[0_0_50px_rgba(16,185,129,0.1)] flex items-center justify-center ring-2 ring-black/20">
+        <div className="flex-grow w-full flex items-center justify-center px-4 overflow-hidden">
+            <div className="relative h-full w-auto aspect-[4/5] max-w-full overflow-hidden rounded-[2rem] border-2 border-white/10 bg-black shadow-2xl flex items-center justify-center">
                  {isCameraReady ? (
-                    <div className="relative w-full h-full">
+                    <>
                        <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${!theme.preferredCameraId ? 'scale-x-[-1]' : ''}`} />
-                       <div className="absolute inset-0 pointer-events-none opacity-100 z-10">
-                         <img src={currentFrame.url} alt="" className="w-full h-full object-contain" />
-                       </div>
+                       <img src={currentFrame.url} alt="" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10" />
                        {countdown !== null && (
                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20">
-                           <span className="text-[12rem] font-black text-white animate-ping drop-shadow-2xl">
-                             {countdown}
-                           </span>
+                           <span className="text-[10rem] font-black text-white animate-ping">{countdown}</span>
                          </div>
                        )}
-                    </div>
+                    </>
                  ) : (
                     <div className="text-center p-6">
-                       {cameraError ? (
-                           <div className="flex flex-col items-center gap-4 text-red-400">
-                               <AlertCircle className="w-12 h-12" />
-                               <p className="font-bold">{cameraError}</p>
-                               <Button variant="secondary" onClick={startCamera} className="py-2 px-4 text-xs">Thử lại</Button>
-                           </div>
-                       ) : (
-                           <div className="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
-                       )}
+                       {cameraError ? <p className="text-red-400 font-bold">{cameraError}</p> : <RefreshCw className="w-10 h-10 animate-spin text-emerald-500 mx-auto" />}
                     </div>
                  )}
             </div>
         </div>
 
-        {/* FOOTER BUTTON */}
-        <div className="w-full max-w-[320px] flex-shrink-0 px-4 mt-2 flex">
+        <div className="w-full max-w-[320px] px-4 mt-2">
             <Button 
                 variant="visual" 
-                onClick={startCaptureSequence} 
+                onClick={startCountdown} 
                 disabled={!isCameraReady || processingState !== 'idle' || countdown !== null} 
-                className="w-full py-2.5 font-black rounded-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 text-base"
-                style={{ fontSize: `${fonts.button * 0.9}px` }}
+                className="w-full py-3"
             >
-                {countdown !== null ? `CHUẨN BỊ... ${countdown}` : (
-                  <>
-                    <Camera className="w-4 h-4" />
-                    {theme.captureButtonText}
-                  </>
-                )}
+                {countdown !== null ? "CHỜ XÍU..." : <><Camera className="w-5 h-5" /> {theme.captureButtonText}</>}
             </Button>
         </div>
       </div>
@@ -381,67 +327,31 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
 
   if (step === 'result' && finalImage) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center px-4 pb-6 pt-2 animate-fade-in overflow-hidden gap-3">
-        
-        <div className="w-full text-center flex-shrink-0">
-            <h2 
-                className="font-black text-white mb-0.5 uppercase tracking-tighter drop-shadow-2xl text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400"
-                style={{ fontSize: `${fonts.resultTitle * 0.8}px` }}
-            >
-                {theme.congratsText}
-            </h2>
-            <p 
-                className="text-slate-100 tracking-wide font-medium opacity-90"
-                style={{ fontSize: `${fonts.resultSubtitle * 0.8}px` }}
-            >
-                {theme.resultInstructions}
-            </p>
+      <div className="h-full w-full flex flex-col items-center justify-center px-4 pb-6 pt-2 animate-fade-in gap-3 overflow-hidden">
+        <div className="text-center">
+            <h2 className="font-black text-white mb-0.5 uppercase tracking-tighter" style={{ fontSize: `${fonts.resultTitle * 0.7}px` }}>{theme.congratsText}</h2>
+            <p className="text-slate-400 text-xs">{theme.resultInstructions}</p>
         </div>
 
-        <div className="relative h-[65%] w-auto aspect-[4/5] rounded-[1.5rem] overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border-2 border-white/10 bg-slate-900 shrink-0">
+        <div className="relative h-[65%] w-auto aspect-[4/5] rounded-[1.5rem] overflow-hidden shadow-2xl border-2 border-white/10 shrink-0">
             <img src={finalImage} alt="Result" className="w-full h-full object-contain" />
         </div>
 
-        <div className="w-full max-w-[340px] flex items-stretch gap-2 shrink-0 z-20 h-24">
-            <div className="flex-[3] bg-white rounded-[1.5rem] p-2.5 flex items-center gap-3 shadow-2xl border-2 border-emerald-400/50">
-                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1 flex items-center justify-center border border-slate-100 overflow-hidden relative">
-                    {cloudUrl ? (
-                        <QRCode value={cloudUrl} style={{ height: "100%", width: "100%" }} />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center text-emerald-500 animate-pulse">
-                            <RefreshCw className="w-6 h-6 animate-spin mb-1" />
-                            <span className="text-[8px] font-black uppercase">Đang tạo...</span>
-                        </div>
-                    )}
+        <div className="w-full max-w-[340px] flex items-stretch gap-2 shrink-0 h-24">
+            <div className="flex-[3] bg-white rounded-[1.5rem] p-2 flex items-center gap-3 shadow-2xl border-2 border-emerald-400/50">
+                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1 flex items-center justify-center border border-slate-100 overflow-hidden">
+                    {cloudUrl ? <QRCode value={cloudUrl} style={{ height: "100%", width: "100%" }} /> : <RefreshCw className="w-6 h-6 animate-spin text-emerald-500" />}
                 </div>
                 <div className="flex-1 flex flex-col justify-center min-w-0">
-                     <p 
-                        className="font-black leading-none text-slate-900 uppercase tracking-tighter whitespace-nowrap mb-1"
-                        style={{ fontSize: `${fonts.qrTitle * 0.6}px` }}
-                     >
-                        {theme.qrScanText}
+                     <p className="font-black leading-none text-slate-900 uppercase text-sm mb-1">{theme.qrScanText}</p>
+                     <p className="text-[10px] text-emerald-600 font-bold italic truncate">
+                        {cloudUrl ? "Quét để tải ngay!" : "Đang tạo mã..."}
                      </p>
-                     <div 
-                        className="flex items-center gap-1.5 text-emerald-700 font-bold italic truncate"
-                        style={{ fontSize: `${fonts.qrSubtitle * 0.75}px` }}
-                     >
-                        {cloudUrl ? <CloudUpload className="w-4 h-4" /> : <RefreshCw className="w-4 h-4 animate-spin" />}
-                        <span>{cloudUrl ? "Quét để tải ngay!" : "Đang đẩy lên mây..."}</span>
-                     </div>
                 </div>
             </div>
-
-            <Button 
-                variant="secondary" 
-                onClick={handleRetake} 
-                isLoading={isDeleting} 
-                disabled={isDeleting} 
-                className="flex-1 rounded-[1.5rem] flex-col gap-1 !px-2 bg-slate-800/95 border-white/10 shadow-xl" 
-                style={{ fontSize: `${fonts.button * 0.65}px` }}
-            >
-                <RefreshCw className="w-5 h-5 mb-0.5 text-emerald-400" /> 
-                <span className="leading-none text-center font-bold uppercase">{theme.retakeButtonText}</span> 
-                {autoHomeCountdown !== null && <span className="font-mono text-emerald-400/80 text-[10px]">({autoHomeCountdown}s)</span>}
+            <Button variant="secondary" onClick={handleRetake} isLoading={isDeleting} className="flex-1 rounded-[1.5rem] flex-col !p-0">
+                <RefreshCw className="w-4 h-4 text-emerald-400" />
+                <span className="text-[10px] font-black uppercase">{theme.retakeButtonText}</span>
             </Button>
         </div>
       </div>
