@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, RefreshCw, XCircle, Cloud, Upload } from 'lucide-react';
+import { RefreshCw, Cloud, Upload } from 'lucide-react';
 import { Button } from './Button';
 import { Frame, ThemeConfig, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
