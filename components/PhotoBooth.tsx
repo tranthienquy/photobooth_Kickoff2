@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { RefreshCw, CloudUpload, Camera } from 'lucide-react';
 import { Button } from './Button';
@@ -93,7 +92,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
 
   useEffect(() => {
     if (step === 'result') {
-      setAutoHomeCountdown(30); 
+      setAutoHomeCountdown(45); 
     } else {
       setAutoHomeCountdown(null);
     }
@@ -137,7 +136,6 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
         audio: false
       };
 
-      // Fix: Use navigator.mediaDevices.getUserMedia instead of the deprecated navigator.getUserMedia
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       setIsCameraReady(true);
@@ -183,24 +181,20 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
       const finalResult = await compositeFrame(remixedImage, currentFrame.url);
       setFinalImage(finalResult);
       
-      let uploadSuccess = false;
       if (theme.firebaseConfig?.apiKey) {
           setProcessingState('uploading');
           try {
               const url = await uploadToFirebase(finalResult, theme.firebaseConfig);
               setCloudUrl(url);
-              uploadSuccess = true;
           } catch (e) {
               console.error("Firebase auto-upload failed", e);
+              // Fallback to locally generated image even if upload fails
           }
       }
 
       stopCamera();
       setStep('result');
-      
-      if (!theme.firebaseConfig?.apiKey || uploadSuccess) {
-          onPhotoTaken();
-      }
+      onPhotoTaken();
       
     } catch (error) {
       console.error("AI processing failed, falling back to original", error);
@@ -402,24 +396,24 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             <img src={finalImage} alt="Result" className="w-full h-full object-contain" />
         </div>
 
-        <div className="w-full max-w-[300px] flex items-stretch gap-2 shrink-0 z-20 h-20">
-            <div className="flex-[2.5] bg-white rounded-[1rem] p-2 flex items-center gap-2.5 shadow-xl border border-emerald-400/30">
-                <div className="h-full aspect-square bg-slate-50 rounded-lg p-1 flex items-center justify-center border border-slate-100">
-                    <QRCode value={cloudUrl || window.location.href} style={{ height: "100%", width: "100%" }} />
+        <div className="w-full max-w-[320px] flex items-stretch gap-2 shrink-0 z-20 h-24">
+            <div className="flex-[3] bg-white rounded-[1.5rem] p-2.5 flex items-center gap-3 shadow-2xl border-2 border-emerald-400/50">
+                <div className="h-full aspect-square bg-slate-50 rounded-xl p-1.5 flex items-center justify-center border border-slate-100">
+                    <QRCode value={cloudUrl || "https://google.com"} style={{ height: "100%", width: "100%" }} />
                 </div>
                 <div className="flex-1 flex flex-col justify-center min-w-0">
                      <p 
-                        className="font-black leading-none text-slate-900 uppercase tracking-tighter whitespace-nowrap mb-0.5"
-                        style={{ fontSize: `${fonts.qrTitle * 0.55}px` }}
+                        className="font-black leading-none text-slate-900 uppercase tracking-tighter whitespace-nowrap mb-1"
+                        style={{ fontSize: `${fonts.qrTitle * 0.6}px` }}
                      >
                         {theme.qrScanText}
                      </p>
                      <div 
-                        className="flex items-center gap-1 text-emerald-700 font-bold italic truncate"
-                        style={{ fontSize: `${fonts.qrSubtitle * 0.65}px` }}
+                        className="flex items-center gap-1.5 text-emerald-700 font-bold italic truncate"
+                        style={{ fontSize: `${fonts.qrSubtitle * 0.75}px` }}
                      >
-                        {cloudUrl ? <CloudUpload className="w-3.5 h-3.5" /> : <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                        <span>{cloudUrl ? "Quét để tải!" : "Chờ xíu..."}</span>
+                        {cloudUrl ? <CloudUpload className="w-4 h-4" /> : <RefreshCw className="w-4 h-4 animate-spin" />}
+                        <span>{cloudUrl ? "Quét để tải ngay!" : "Đang tạo mã..."}</span>
                      </div>
                 </div>
             </div>
@@ -429,12 +423,12 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                 onClick={handleRetake} 
                 isLoading={isDeleting} 
                 disabled={isDeleting} 
-                className="flex-1 rounded-[1rem] flex-col gap-0.5 !px-1 bg-slate-800/90 border-white/5 shadow-xl" 
-                style={{ fontSize: `${fonts.button * 0.6}px` }}
+                className="flex-1 rounded-[1.5rem] flex-col gap-1 !px-2 bg-slate-800/95 border-white/10 shadow-xl" 
+                style={{ fontSize: `${fonts.button * 0.65}px` }}
             >
-                <RefreshCw className="w-4 h-4 mb-0.5 text-emerald-400" /> 
+                <RefreshCw className="w-5 h-5 mb-0.5 text-emerald-400" /> 
                 <span className="leading-none text-center font-bold uppercase">{theme.retakeButtonText}</span> 
-                {autoHomeCountdown !== null && <span className="font-mono text-emerald-400/60 text-[9px]">({autoHomeCountdown}s)</span>}
+                {autoHomeCountdown !== null && <span className="font-mono text-emerald-400/80 text-[10px]">({autoHomeCountdown}s)</span>}
             </Button>
         </div>
       </div>

@@ -1,10 +1,11 @@
-
-import { initializeApp, getApp, getApps } from "firebase/app";
+// Fix: Use namespaced import for better compatibility with different module systems
+import * as firebaseApp from "firebase/app";
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import { getFirestore, doc, setDoc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { FirebaseConfig, Frame, ThemeConfig, AdminStats } from "../types";
 
-// Helper để upload ảnh asset (khung, logo)
+const { initializeApp, getApp, getApps } = firebaseApp;
+
 const uploadAsset = async (storage: any, base64String: string, path: string): Promise<string> => {
   if (!base64String || !base64String.startsWith('data:')) return base64String;
   
@@ -26,8 +27,14 @@ export const uploadToFirebase = async (base64Image: string, config: FirebaseConf
 
   try {
     const dataPart = base64Image.split(',')[1];
-    await uploadString(storageRef, dataPart, 'base64', { contentType: 'image/jpeg' });
-    return await getDownloadURL(storageRef);
+    // Use uploadString for convenience with Base64
+    const snapshot = await uploadString(storageRef, dataPart, 'base64', { 
+        contentType: 'image/jpeg',
+        cacheControl: 'public,max-age=31536000'
+    });
+    const downloadUrl = await getDownloadURL(snapshot.ref);
+    console.log("Uploaded successfully:", downloadUrl);
+    return downloadUrl;
   } catch (error) {
     console.error("Firebase upload error:", error);
     throw error;
@@ -40,13 +47,13 @@ export const deleteFromFirebase = async (imageUrl: string, config: FirebaseConfi
   const app = getApps().length === 0 ? initializeApp(config) : getApp();
   const storage = getStorage(app);
   
-  const storageRef = ref(storage, imageUrl);
-
+  // We need to extract the path from the full URL or handle it safely
   try {
+    const storageRef = ref(storage, imageUrl);
     await deleteObject(storageRef);
     console.log("Deleted image from cloud:", imageUrl);
   } catch (error) {
-    console.error("Error deleting image:", error);
+    console.warn("Error deleting image (might already be gone):", error);
   }
 };
 
@@ -61,7 +68,6 @@ export const incrementPhotoCount = async (config: FirebaseConfig): Promise<void>
         "stats.totalPhotos": increment(1)
     });
   } catch (error) {
-      // If doc doesn't exist yet, set it
       console.warn("Stats doc missing, creating new one...");
       await setDoc(docRef, { stats: { totalPhotos: 1 } }, { merge: true });
   }
@@ -79,7 +85,6 @@ export const saveSystemConfiguration = async (
   const storage = getStorage(app);
   const db = getFirestore(app);
 
-  // 1. Xử lý upload ảnh Frames (nếu đang là base64)
   const processedFrames = await Promise.all(frames.map(async (frame) => {
     if (frame.url.startsWith('data:')) {
       const url = await uploadAsset(storage, frame.url, `assets/frames/${frame.id}.png`);
@@ -88,7 +93,6 @@ export const saveSystemConfiguration = async (
     return frame;
   }));
 
-  // 2. Xử lý upload Assets trong Theme (Logo, Background, Loading Icon)
   let processedTheme = { ...theme };
   
   if (theme.logoUrl && theme.logoUrl.startsWith('data:')) {
@@ -97,7 +101,6 @@ export const saveSystemConfiguration = async (
   }
 
   if (theme.loadingIconUrl && theme.loadingIconUrl.startsWith('data:')) {
-    // Timestamp để tránh cache
     const url = await uploadAsset(storage, theme.loadingIconUrl, `assets/branding/loading_${Date.now()}.png`);
     processedTheme.loadingIconUrl = url;
   }
@@ -107,7 +110,6 @@ export const saveSystemConfiguration = async (
     processedTheme.backgroundImageUrl = url;
   }
 
-  // 3. Lưu JSON vào Firestore
   try {
     await setDoc(doc(db, "settings", "global"), {
       frames: processedFrames,

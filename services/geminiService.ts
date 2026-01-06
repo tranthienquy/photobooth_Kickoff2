@@ -1,5 +1,5 @@
-
-import { GoogleGenAI } from "@google/genai";
+// Fix: Follow @google/genai guidelines for imports and model initialization
+import {GoogleGenAI} from "@google/genai";
 
 const cleanBase64 = (dataUri: string) => {
   return dataUri.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
@@ -39,20 +39,22 @@ const resizeAndCompressImage = (base64Str: string, maxWidth = 1024, quality = 0.
 
 export const generateAiFrame = async (prompt: string): Promise<string> => {
   try {
-    // Correctly initialize with named parameter and environment variable
+    // Fix: Create instance right before API call
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: { 
           parts: [{ text: `Create a professional 4:5 portrait photo frame border with theme: ${prompt}. Center must be transparent.` }] 
       },
-      config: { imageConfig: { aspectRatio: "3:4" } }, 
+      config: { 
+        imageConfig: { aspectRatio: "3:4" } 
+      }, 
     });
 
-    // Iterate through all parts to find the image part as recommended for image generation models
     const candidates = response.candidates;
     if (candidates && candidates.length > 0) {
       const parts = candidates[0].content.parts;
+      // Fix: Iterate parts to find the image part as per guideline
       for (const part of parts) {
         if (part.inlineData) {
           return `data:image/png;base64,${part.inlineData.data}`;
@@ -67,24 +69,24 @@ export const generateAiFrame = async (prompt: string): Promise<string> => {
 };
 
 export const remixUserPhoto = async (imageSrc: string, style: 'mascot' | 'cyberpunk' | 'anime' | 'portrait'): Promise<string> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing from environment");
-
-  // Correctly initialize with named parameter and environment variable
+  // Fix: Create instance right before API call
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const optimizedImage = await resizeAndCompressImage(imageSrc, 1024, 0.85);
   const base64Data = cleanBase64(optimizedImage);
 
-  let prompt = `ACT AS A PRO PHOTO EDITOR.
-  TASK: ADD MASCOT "Aiyogu" NEXT TO THE PERSON IN THIS 4:5 PHOTO.
+  // Assertive prompt for Mascot placement
+  let prompt = `URGENT TASK: ADD A 3D MASCOT CHARACTER "AIYOGU" INTO THIS PHOTO.
   
-  MASCOT AIYOGU DESCRIPTION: 
-  Vibrant orange 3D plump creature, curved horns with glowing cyan rings, sparkling eyes, gold chain "Aiyogu".
+  MASCOT APPEARANCE: 
+  A friendly, vibrant orange 3D plump creature. It has curved horns with glowing cyan/neon blue rings. Sparkling big eyes. Wearing a thick gold chain with a medallion that says "Aiyogu".
   
-  RULES:
-  - DO NOT CHANGE the person or the background.
-  - PLACE Aiyogu naturally standing or floating next to the person.
-  - Output ONLY the modified image.`;
+  PLACEMENT RULE:
+  - Place Aiyogu standing or floating IMMEDIATELY NEXT to the person in the photo.
+  - The mascot should occupy about 25% of the frame.
+  - KEEP THE ORIGINAL PERSON AND BACKGROUND 100% THE SAME.
+  - Lighting should match the original photo.
+  
+  Return ONLY the modified image.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -100,11 +102,11 @@ export const remixUserPhoto = async (imageSrc: string, style: 'mascot' | 'cyberp
       }
     });
 
-    // Safely extract parts from candidates and find the image data
     const candidates = response.candidates;
     if (!candidates || candidates.length === 0) throw new Error("Empty response from Gemini");
 
     const parts = candidates[0].content.parts;
+    // Fix: Iterate parts to find the image part
     for (const part of parts) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;
