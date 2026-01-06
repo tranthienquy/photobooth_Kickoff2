@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, RefreshCw, XCircle, CloudUpload, Upload } from 'lucide-react';
+import { Download, RefreshCw, XCircle, Cloud, Upload } from 'lucide-react';
 import { Button } from './Button';
 import { Frame, ThemeConfig, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -516,7 +516,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                         className="flex items-center gap-1.5 text-slate-600 font-bold italic truncate"
                         style={{ fontSize: `${fonts.qrSubtitle * 0.8}px` }}
                      >
-                        {cloudUrl ? <CloudUpload className="w-4 h-4 text-emerald-600" /> : <span className="animate-pulse">...</span>}
+                        {cloudUrl ? <Cloud className="w-4 h-4 text-emerald-600" /> : <span className="animate-pulse">...</span>}
                         <span>{cloudUrl ? "Ảnh đã sẵn sàng!" : "Đang tạo mã..."}</span>
                      </div>
                 </div>
@@ -524,16 +524,16 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
 
             {/* Retake Button */}
             <Button 
-                variant="secondary" 
+                variant="visual" 
                 onClick={handleRetake} 
                 isLoading={isDeleting} 
                 disabled={isDeleting} 
-                className="w-1/3 rounded-3xl flex-col gap-1 !px-2 bg-slate-800/80 hover:bg-slate-700 backdrop-blur-md border-white/10" 
+                className="w-1/3 rounded-3xl flex-col gap-1 !px-2 shadow-lg" 
                 style={{ fontSize: `${fonts.button * 0.7}px` }}
             >
-                <RefreshCw className="w-6 h-6 mb-1 text-white/80" /> 
+                <RefreshCw className="w-6 h-6 mb-1 text-white" /> 
                 <span className="leading-none text-center">{theme.retakeButtonText}</span> 
-                {autoHomeCountdown !== null && <span className="font-mono text-emerald-400 font-bold">({autoHomeCountdown})</span>}
+                {autoHomeCountdown !== null && <span className="font-mono text-white/90 font-bold">({autoHomeCountdown})</span>}
             </Button>
         </div>
       </div>
