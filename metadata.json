@@ -1,0 +1,7 @@
+{
+  "name": "TechEvent Mascot Booth",
+  "description": "A photo booth application where users can take photos with event mascots, customize frames, and download the results. Features AI-generated frames.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
