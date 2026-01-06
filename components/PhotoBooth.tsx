@@ -517,7 +517,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                         style={{ fontSize: `${fonts.qrSubtitle * 0.8}px` }}
                      >
                         {cloudUrl ? <Cloud className="w-4 h-4 text-emerald-600" /> : <span className="animate-pulse">...</span>}
-                        <span>{cloudUrl ? "Ảnh đã sẵn sàng!" : "Đang tạo mã..."}</span>
+                        <span>{cloudUrl ? "Ảnh đã sẵn sàng!" : "Đang tạo mã..."}</span
                      </div>
                 </div>
             </div>
