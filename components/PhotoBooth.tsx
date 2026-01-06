@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, RefreshCw, XCircle, CloudUpload } from 'lucide-react';
+import { Download, RefreshCw, XCircle, CloudUpload, Upload } from 'lucide-react';
 import { Button } from './Button';
 import { Frame, ThemeConfig, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
@@ -67,6 +66,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const t = TRANSLATIONS[language];
   const currentFrame = frames.find(f => f.id === selectedFrameId) || frames[0];
@@ -192,14 +192,51 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
     });
   };
 
+  const processAndUpload = async (sourceImage: string) => {
+      setProcessingState('ai');
+      try {
+        const remixedImage = await remixUserPhoto(sourceImage, 'mascot');
+        const finalResult = await compositeFrame(remixedImage, currentFrame.url);
+        setFinalImage(finalResult);
+        
+        let uploadSuccess = false;
+        if (theme.firebaseConfig?.apiKey) {
+            setProcessingState('uploading');
+            try {
+                const url = await uploadToFirebase(finalResult, theme.firebaseConfig);
+                setCloudUrl(url);
+                uploadSuccess = true;
+            } catch (e) {
+                console.error("Firebase auto-upload failed", e);
+            }
+        }
+  
+        stopCamera();
+        setStep('result');
+        
+        // LOGIC: Chỉ đếm số lượng ảnh nếu upload thành công hoặc chạy offline
+        if (!theme.firebaseConfig?.apiKey || uploadSuccess) {
+            onPhotoTaken();
+        }
+      } catch (error) {
+        console.error("AI processing failed, falling back to original", error);
+        // Fallback: Composite original capture with frame
+        const finalResult = await compositeFrame(sourceImage, currentFrame.url);
+        setFinalImage(finalResult);
+        stopCamera();
+        setStep('result');
+        onPhotoTaken(); 
+      } finally {
+        setProcessingState('idle');
+      }
+  };
+
   const handleCapture = async () => {
     if (!videoRef.current) return;
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 200);
     
     const video = videoRef.current;
-    const track = streamRef.current?.getVideoTracks()[0];
-    const settings = track?.getSettings();
     
     // Get actual source resolution from the camera stream
     const sourceW = video.videoWidth;
@@ -232,6 +269,8 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const track = streamRef.current?.getVideoTracks()[0];
+    const settings = track?.getSettings();
     const isExternal = !!theme.preferredCameraId;
     const shouldMirror = !isExternal && (settings?.facingMode === 'user' || !settings?.facingMode);
 
@@ -247,46 +286,54 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
     // Get high-quality base64
     const capturedImage = canvas.toDataURL('image/jpeg', 1.0);
     
-    setProcessingState('ai');
-    try {
-      const remixedImage = await remixUserPhoto(capturedImage, 'mascot');
-      const finalResult = await compositeFrame(remixedImage, currentFrame.url);
-      setFinalImage(finalResult);
-      
-      let uploadSuccess = false;
-      if (theme.firebaseConfig?.apiKey) {
-          setProcessingState('uploading');
-          try {
-              const url = await uploadToFirebase(finalResult, theme.firebaseConfig);
-              setCloudUrl(url);
-              uploadSuccess = true;
-          } catch (e) {
-              console.error("Firebase auto-upload failed", e);
-          }
-      }
+    await processAndUpload(capturedImage);
+  };
 
-      stopCamera();
-      setStep('result');
-      
-      // LOGIC MỚI: Chỉ đếm số lượng ảnh nếu upload thành công (có QR để quét) 
-      // hoặc nếu đang chạy chế độ Offline (không có config Firebase).
-      if (!theme.firebaseConfig?.apiKey || uploadSuccess) {
-          onPhotoTaken();
-      }
-      
-    } catch (error) {
-      console.error("AI processing failed, falling back to original", error);
-      // Fallback: Composite original high-res capture with frame
-      const finalResult = await compositeFrame(capturedImage, currentFrame.url);
-      setFinalImage(finalResult);
-      stopCamera();
-      setStep('result');
-      // Fallback also counts if upload logic passed in the remix block, but here we simplify
-      // In error fallback, we assume offline/local fallback for now unless we want to retry upload.
-      onPhotoTaken(); 
-    } finally {
-      setProcessingState('idle');
-    }
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset value so same file can be chosen again
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        const rawBase64 = event.target?.result as string;
+        if (!rawBase64) return;
+        
+        // Manual crop to 4:5 to ensure frame fits perfectly
+        const img = new Image();
+        img.src = rawBase64;
+        await new Promise((resolve) => { img.onload = resolve; });
+
+        const targetRatio = 4/5;
+        const srcRatio = img.width / img.height;
+        let cropW, cropH, cropX, cropY;
+
+        if (srcRatio > targetRatio) {
+            // Wider -> Crop Width
+            cropH = img.height;
+            cropW = img.height * targetRatio;
+            cropX = (img.width - cropW) / 2;
+            cropY = 0;
+        } else {
+            // Taller -> Crop Height
+            cropW = img.width;
+            cropH = img.width / targetRatio;
+            cropX = 0;
+            cropY = (img.height - cropH) / 2;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = cropW;
+        canvas.height = cropH;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        
+        const croppedImage = canvas.toDataURL('image/jpeg', 1.0);
+        await processAndUpload(croppedImage);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRetake = async () => {
@@ -337,7 +384,7 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
                     className="text-cyan-50 font-bold mt-12 animate-pulse uppercase tracking-widest"
                     style={{ fontSize: `${fonts.loadingText * 0.8}px` }}
                 >
-                    {processingState === 'ai' ? "bạn vui lòng chờ xíu nhé" : "bạn vui lòng chờ xíu nhé"}
+                    {processingState === 'ai' ? "bạn vui lòng chờ xíu nhé" : "đang tải ảnh lên..."}
                 </p>
             </div>
         )}
@@ -389,13 +436,33 @@ export const PhotoBooth: React.FC<PhotoBoothProps> = ({ frames, selectedFrameId,
             </div>
         </div>
 
-        {/* FOOTER BUTTON - Thu nhỏ lại còn 30% */}
-        <div className=" h-[10%] w-[20%] min-w-[200px] flex-shrink-0 mx-auto mb-20">
+        {/* FOOTER BUTTONS */}
+        <div className="h-[10%] w-full flex items-center justify-center gap-4 mx-auto mb-20 px-6 z-40">
+            {/* Hidden File Input */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                className="hidden" 
+                accept="image/*"
+            />
+            
+            {/* Upload Button */}
+            <Button
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={processingState !== 'idle' || countdown !== null}
+                className="h-16 w-16 !p-0 rounded-full flex items-center justify-center shadow-lg bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 shrink-0"
+            >
+                <Upload className="w-6 h-6 text-white" />
+            </Button>
+
+            {/* Capture Button */}
             <Button 
                 variant="visual" 
                 onClick={startCaptureSequence} 
                 disabled={!isCameraReady || processingState !== 'idle' || countdown !== null} 
-                className="w-full py-3 font-bold rounded-full shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-transform"
+                className="w-full max-w-xs py-3 font-bold rounded-full shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-transform"
                 style={{ fontSize: `${fonts.button}px` }}
             >
                 {countdown !== null ? `CƯỜI LÊN NÀO... ${countdown}` : theme.captureButtonText}
